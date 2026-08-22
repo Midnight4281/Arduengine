@@ -79,6 +79,15 @@ class AbstractGame {
     result |= ((uint32_t)f.read() << 24);
     return result;
   }
+  void drawPixel(int16_t x, int16_t y, uint8_t xs, uint8_t ys, uint16_t color) {
+    for(int k = 0; k < xs; k++) {
+      for(int j = 0; j < ys; j++) {
+        if ((x + k) < SCREEN_WIDTH && (y + j) < SCREEN_HEIGHT) {
+          display.drawPixel(x + k, y + j, color);
+        }
+      }
+    }
+  }
 
   // Function to draw BMP from SD card
   void drawBMP(const char *filename, int x, int y) {
@@ -203,14 +212,7 @@ class AbstractGame {
           if(r != 1 && g != 1 && b != 1) {
             color = DIYables_TFT::colorRGB(r, g, b);
 
-            // Draw pixel on screen if within bounds
-            for(int k = 0; k < xScale; k++) {
-              for(int j = 0; j < yScale; j++) {
-                if ((x + (col + i) * xScale + k) < SCREEN_WIDTH && (y + row * yScale + j) < SCREEN_HEIGHT) {
-                  display.drawPixel(x + (col + i) * xScale + k, y + row * yScale + j, color);
-                }
-              }
-            }
+            drawPixel(x + (col + i) * xScale, y + row * yScale, xScale, yScale, color);
           }
         }
       }
@@ -350,13 +352,7 @@ class AbstractGame {
             // Draw pixel on screen if within bounds
             for(int d = 0; d < xAmt; d++) {
               for(int s = 0; s < yAmt; s++) {
-                for(int k = 0; k < xScale; k++) {
-                  for(int j = 0; j < yScale; j++) {
-                    if ((x + (col + i) * xScale + k + (d * xSize)) < SCREEN_WIDTH && (y + row * yScale + j + (s * ySize)) < SCREEN_HEIGHT) {
-                     display.drawPixel(x + (col + i) * xScale + k + (d * xSize), y + row * yScale + j + (s * ySize), color);
-                    }
-                  }
-                }
+                drawPixel(x + (col + i) * xScale + (d * xSize), y + row * yScale + (s * ySize), xScale, yScale, color);
               }
             }
           }
@@ -511,7 +507,6 @@ class AbstractGame {
       display.fillRect(x, y + radY, radX, yScale, color);
       display.fillRect(x + xScale - radX, y + radY, radX, yScale, color);
       display.fillRect(x, y + yScale - radY, xScale, radY, color);
-      Serial.println("Drew 1x1 border");
       return;
     }
 
@@ -542,13 +537,7 @@ class AbstractGame {
           if(r != 1 && g != 1 && b != 1) {
             color = DIYables_TFT::colorRGB(r, g, b);
             // Draw pixel on screen if within bounds
-            for(int k = 0; k < xScale; k++) {
-              for(int j = 0; j < yScale; j++) {
-                if ((x + (col + i) * xScale + k) < SCREEN_WIDTH && (y + row * yScale + j) < SCREEN_HEIGHT) {
-                  display.drawPixel(x + (col + i) * xScale + k, y + row * yScale + j, color);
-                }
-              }
-            }
+            drawPixel(x + (col + i) * xScale, y + row * yScale, xScale, yScale, color);
           }
         }
       }
@@ -571,13 +560,7 @@ class AbstractGame {
           if(r != 1 && g != 1 && b != 1) {
             color = DIYables_TFT::colorRGB(r, g, b);
             // Draw pixel on screen if within bounds
-            for(int k = 0; k < xScale; k++) {
-              for(int j = 0; j < yScale; j++) {
-                if ((x + (col + i) * xScale + k) < SCREEN_WIDTH && (y + (row + radY) * yScale + j) < SCREEN_HEIGHT) {
-                  display.drawPixel(x + (col + i) * xScale + k, y + (row + radY) * yScale + j, color);
-                }
-              }
-            }
+            drawPixel(x + (col + i) * xScale, y + row * yScale, xScale, yScale, color);
           }
         }
       }
@@ -594,13 +577,7 @@ class AbstractGame {
           if(r != 1 && g != 1 && b != 1) {
             color = DIYables_TFT::colorRGB(r, g, b);
             // Draw pixel on screen if within bounds
-            for(int k = 0; k < xScale; k++) {
-              for(int j = 0; j < yScale; j++) {
-                if ((x + (col + i + maxCol - radX) * xScale + k) < SCREEN_WIDTH && (y + (row + radY) * yScale + j) < SCREEN_HEIGHT) {
-                  display.drawPixel(x + (col + i + maxCol - radX) * xScale + k, y + (row + radY) * yScale + j, color);
-                }
-              }
-            }
+            drawPixel(x + (col + i) * xScale, y + row * yScale, xScale, yScale, color);
           }
         }
       }
@@ -623,13 +600,7 @@ class AbstractGame {
           if(r != 1 && g != 1 && b != 1) {
             color = DIYables_TFT::colorRGB(r, g, b);
             // Draw pixel on screen if within bounds
-            for(int k = 0; k < xScale; k++) {
-              for(int j = 0; j < yScale; j++) {
-                if ((x + (col + i) * xScale + k) < SCREEN_WIDTH && (y + (row + maxRow - radY) * yScale + j) < SCREEN_HEIGHT) {
-                  display.drawPixel(x + (col + i) * xScale + k, y + (row + maxRow - radY) * yScale + j, color);
-                }
-              }
-            }
+            drawPixel(x + (col + i) * xScale, y + row * yScale, xScale, yScale, color);
           }
         }
       }
