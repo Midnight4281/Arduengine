@@ -3,35 +3,35 @@
 void Minesweeper::frameTick() {
   int16_t x = board.getXAtNumeric(currentPos);
   int16_t y = board.getYAtNumeric(currentPos);
-  if(buttons.getButtonWentDown("L")) {
+  if(buttons->getButtonWentDown("L")) {
     if(board.movementIsOnBoard(x, y, -1, 0)) {
       drawTile(currentPos, false, true, false);
       currentPos = currentPos - 1;
       drawTile(currentPos, false, true, true);
     }
-  } else if(buttons.getButtonWentDown("R")) {
+  } else if(buttons->getButtonWentDown("R")) {
     if(board.movementIsOnBoard(x, y, 1, 0)) {
       drawTile(currentPos, false, true, false);
       currentPos = currentPos + 1;
       drawTile(currentPos, false, true, true);
     }
-  } else if(buttons.getButtonWentDown("U")) {
+  } else if(buttons->getButtonWentDown("U")) {
     if(board.movementIsOnBoard(x, y, 0, -1)) {
       drawTile(currentPos, false, true, false);
       currentPos = currentPos - board.getXSize();
       drawTile(currentPos, false, true, true);
     }
-  } else if(buttons.getButtonWentDown("D")) {
+  } else if(buttons->getButtonWentDown("D")) {
     if(board.movementIsOnBoard(x, y, 0, 1)) {
       drawTile(currentPos, false, true, false);
       currentPos = currentPos + board.getXSize();
       drawTile(currentPos, false, true, true);
     }
   }
-  if(buttons.getButtonWentDown("A")) {
+  if(buttons->getButtonWentDown("A")) {
     clickTile(currentPos, false, true);
   }
-  if(buttons.getButtonWentDown("B")) {
+  if(buttons->getButtonWentDown("B")) {
     clickTile(currentPos, true, true);
   }
 }
@@ -134,7 +134,7 @@ void Minesweeper::drawTile(int16_t tile, bool drawMiddle, bool drawBorder, bool 
             drawBorderBMP("mine", xDraw, yDraw, 4);
           } else if (v >= 10){
             if(v == 10) {
-              drawBMP("tile_0", xDraw, yDraw);
+              drawBorderBMP("tile_0", xDraw, yDraw, 4);
             } else {
               drawBorderBMP(("tile_" + String(v - 10)).c_str(), xDraw, yDraw, 4);
             }
@@ -169,7 +169,6 @@ void Minesweeper::reset() {
           int8_t xd = board.getXAtNumeric(i) + x - 1;
           int8_t yd = board.getYAtNumeric(i) + y - 1;
           if(board.isOnBoard(xd, yd)) {
-            //Serial.println(board.getNumericAtPos(xd, yd));
             if(board.getVal(board.getNumericAtPos(xd, yd)) == 9) {
               f++;
             }
@@ -178,7 +177,6 @@ void Minesweeper::reset() {
       }
       board.setVal(i, f);
     }
-    //drawTile(i, true, false, false);
   }
   drawBMPArea("hidden", 0, 0, xSize, ySize);
   drawTile(currentPos, false, true, true);

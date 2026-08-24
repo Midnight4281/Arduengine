@@ -15,18 +15,27 @@ class Minesweeper: public AbstractGame {
     uint16_t flagged;
   public:
     Board board;
-    Minesweeper() {
-      name = "sweep";
-      changeSeed();
+    Minesweeper(bool* flag) : AbstractGame(flag) {
+      name = getName();
     }
     void quitGame() {}
     void startGame() {
+      changeSeed();
       xSize = 10;
       ySize = 10;
       currentPos = 0;
       minesToMake = 15;
       drawScale = SCREEN_WIDTH / xSize;
       reset();
+    }
+    static String getName() {
+      return "sweep";
+    }
+    static String getDisplayName() {
+      return "Minesweeper";
+    }
+    static AbstractGame* createGame(bool* flag) {
+      return new Minesweeper(flag);
     }
     void clickTile(int16_t tile, bool isFlagClick, bool isHuman);
     void reset();

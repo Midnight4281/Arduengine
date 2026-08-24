@@ -9,6 +9,9 @@ class TestGame : public AbstractGame {
     int x = 0;
     int y = 0;
   public:
+    TestGame(bool* flag) : AbstractGame(flag) {
+      name = getName();
+    }
     uint8_t turns = 0;
     uint8_t selectedTile = 0; 
     uint8_t board[9];
@@ -22,14 +25,20 @@ class TestGame : public AbstractGame {
       {0, 4, 8},
       {2, 4, 6}
     };
-    TestGame() {
-      name = "ttt";
-    }
     void quitGame() {
 
     }
     void startGame() {
       reset();
+    }
+    static String getName() {
+      return "ttt";
+    }
+    static String getDisplayName() {
+      return "Tic-Tac-Toe";
+    }
+    static AbstractGame* createGame(bool* flag) {
+      return new TestGame(flag);
     }
     void frameTick();
     void reset();

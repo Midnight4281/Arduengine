@@ -1,21 +1,21 @@
 #include "TestGame.h"
 #include <DIYables_TFT_Shield.h>
 void TestGame::frameTick() {
-  if(buttons.getButtonWentDown("L")) {
+  if(buttons->getButtonWentDown("L")) {
     if(selectedTile % 3 > 0) {
       selectedTile -= 1;
       drawTile(selectedTile, true, false);
       drawTile(selectedTile + 1, true, false);
     }
   }
-  if(buttons.getButtonWentDown("R")) {
+  if(buttons->getButtonWentDown("R")) {
     if(selectedTile % 3 < 2) {
       selectedTile += 1;
       drawTile(selectedTile, true, false);
       drawTile(selectedTile - 1, true, false);
     }
   }
-  if(buttons.getButtonWentDown("U")) {
+  if(buttons->getButtonWentDown("U")) {
     Serial.println(floor(selectedTile / 3));
     if(floor(selectedTile / 3) > 0) {
       selectedTile -= 3;
@@ -23,7 +23,7 @@ void TestGame::frameTick() {
       drawTile(selectedTile + 3, true, false);
     }
   }
-  if(buttons.getButtonWentDown("D")) {
+  if(buttons->getButtonWentDown("D")) {
     if(floor(selectedTile / 3) < 2) {
       selectedTile += 3;
       drawTile(selectedTile, true, false);
@@ -31,7 +31,7 @@ void TestGame::frameTick() {
     }
   }
   //Serial.println(selectedTile);
-  if(buttons.getButtonWentDown("A")) {
+  if(buttons->getButtonWentDown("A")) {
     if(board[selectedTile] == 0) {
       if(turns % 2 == 0) {
         board[selectedTile] = 1;
@@ -69,8 +69,9 @@ void TestGame::reset() {
   selectedTile = 4;
   for(int i = 0; i < 9; i++) {
     board[i] = 0;
-    drawTile(i, true, false);
+    //drawTile(i, true, false);
   }
+  drawBMPArea("empty", 10, 10, 3, 3);
   turns = 0;
 }
 uint8_t TestGame::getTile(uint8_t x, uint8_t y) {

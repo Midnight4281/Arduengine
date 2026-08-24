@@ -34,6 +34,9 @@ class ButtonManager {
     bool getButtonPressed(String keyCode) {//returns if a key is pressed
       return getButtonPressTime(keyCode) > 0;
     }
+    bool getButtonPressed(int i) {//returns if a key is pressed
+      return buttonHeldTimes[i] > 0;
+    }
     bool getButtonWentDown(String keyCode) {
       int i = searchKeys(keyCode);
       return getButtonWentDown(i);

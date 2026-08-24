@@ -9,24 +9,44 @@
 
 #ifndef ABSTRACT_GAME_H
 #define ABSTRACT_GAME_H
-
 class AbstractGame {
   protected:
     int frameRate;
     const int seed_addr = 0;
     unsigned long seed;
+    bool* _isDeletedFlag;
   public:
-    ButtonManager buttons; //reference this in children to use
+    AbstractGame(bool* flag) {
+      _isDeletedFlag = flag;
+      *_isDeletedFlag = false; 
+      //name = getName();
+    }
+    ~AbstractGame() {
+        if (_isDeletedFlag != nullptr) {
+            *_isDeletedFlag = true; // Alert the system it's gone
+        }
+    }
+    ButtonManager* buttons; //reference this in children to use
+
     String name;
+
     DIYables_TFT_ILI9486_Shield display;
     File bmpFile;
     File scFile;
     uint16_t SCREEN_WIDTH;
     uint16_t SCREEN_HEIGHT;
-
-    virtual void quitGame() = 0;
+    
+    virtual void quitGame() = 0;//run by code before deleting game instance, use for storing highscores/settings
+    void exitGame() {//run by code when game ends, do not edit
+      quitGame();
+      display.fillScreen(DIYables_TFT::colorRGB(0, 0, 0));
+      delete this;
+      return;
+    }
     virtual void startGame() = 0;
-    void gameSetup(const ButtonManager& b, const DIYables_TFT_ILI9486_Shield& d) {
+    static String getName() {};
+    static String getDisplayName() {};
+    void gameSetup(ButtonManager *b, const DIYables_TFT_ILI9486_Shield& d) {
       buttons = b;
       display = d;
       display.setRotation(2);  // Rotate screen 180 degrees
@@ -48,9 +68,6 @@ class AbstractGame {
     }
     float randomFloatRange(float minVal, float maxVal) {
       return minVal + (random(0, 1000000) / 1000000.0) * (maxVal - minVal);
-    }
-    void passInputs(const bool (&arr)[8]) {
-      buttons.passInputs(arr);
     }
     virtual void frameTick() = 0;
     int getFrameRate() {return frameRate;}
@@ -88,6 +105,9 @@ class AbstractGame {
       }
     }
   }
+  void drawPixelInImage(int16_t x, int16_t y, uint8_t xd, uint8_t yd, uint8_t xs, uint8_t ys, uint16_t color) {
+    drawPixel(x + (xd * xs), y + (yd * ys), xs, ys, color);
+  }
 
   // Function to draw BMP from SD card
   void drawBMP(const char *filename, int x, int y) {
@@ -105,10 +125,6 @@ class AbstractGame {
       xScale = read16(scFile);
       yScale = read16(scFile);
     }
-    //Serial.print("xScale: ");
-    //Serial.println(xScale);
-    //Serial.print("yScale: ");
-    //Serial.println(yScale);
     scFile.close();
 
     bmpFile = SD.open(name + "/" + String(filename) + ".bmp");
@@ -125,30 +141,22 @@ class AbstractGame {
     }
 
     // Skip unnecessary BMP header details
-    //Serial.println("BMP signature OK");
 
     uint32_t fileSize = read32(bmpFile);
-    //Serial.print("File Size: ");
-    //Serial.println(fileSize);
+
 
     read32(bmpFile); //skip bytes
     
 
     uint32_t imageOffset = read32(bmpFile);  // Start of image data
-    //Serial.print("Image Data Offset: ");
-    //Serial.println(imageOffset);
+
 
     uint32_t dibHeaderSize = read32(bmpFile);  // DIB header size
-    //Serial.print("DIB Header Size: ");
-    //Serial.println(dibHeaderSize);
 
     // Now read the width and height of the image
     uint32_t bmpWidth = read32(bmpFile);
     int32_t bmpHeight = readS32(bmpFile);  // Read as signed 32-bit integer
-    //Serial.print("Image Width: ");
-    //Serial.println(bmpWidth);
-    //Serial.print("Image Height: ");
-    //Serial.println(bmpHeight);
+
 
     bool topDown = false;  // Flag to check if the image is top-down
     if (bmpHeight < 0) {
@@ -163,8 +171,7 @@ class AbstractGame {
     }
 
     uint16_t depth = read16(bmpFile);  // Color depth
-    //Serial.print("Bit Depth: ");
-    //Serial.println(depth);
+
 
     if (depth != 24) {  // Only 24-bit BMP supported
       Serial.println("Only 24-bit BMP is supported");
@@ -187,7 +194,7 @@ class AbstractGame {
 
     // Adjust x and y if image is larger than screen
     if (x >= SCREEN_WIDTH || y >= SCREEN_HEIGHT) {
-      Serial.println("Image position out of screen bounds");
+      Serial.println("Image position out of screen bounds" + SCREEN_WIDTH);
       return;
     }
 
@@ -220,9 +227,9 @@ class AbstractGame {
 
     bmpFile.close();  // Close file when done
     unsigned long endTime = millis();
-    //Serial.println("Finished drawing BMP" + String(filename) + " in "  + String(endTime - startTime) + "ms");
   }
   void drawBMPArea(const char *filename, int x, int y, int xAmt, int yAmt) {
+    Serial.println("Started drawing bmp area");
     unsigned long startTime = millis();
     uint16_t xScale;
 
@@ -242,12 +249,8 @@ class AbstractGame {
       xSize = read16(scFile);
       ySize = read16(scFile);
     }
-    //Serial.print("xScale: ");
-    //Serial.println(xScale);
-    //Serial.print("yScale: ");
-    //Serial.println(yScale);
     scFile.close();
-
+    Serial.println("Found sc file");
     bmpFile = SD.open(name + "/" + String(filename) + ".bmp");
 
     if (!bmpFile) {
@@ -261,31 +264,19 @@ class AbstractGame {
       return;
     }
 
-    // Skip unnecessary BMP header details
-    //Serial.println("BMP signature OK");
 
     uint32_t fileSize = read32(bmpFile);
-    //Serial.print("File Size: ");
-    //Serial.println(fileSize);
 
     read32(bmpFile); //skip bytes
     
-
     uint32_t imageOffset = read32(bmpFile);  // Start of image data
-    //Serial.print("Image Data Offset: ");
-    //Serial.println(imageOffset);
 
     uint32_t dibHeaderSize = read32(bmpFile);  // DIB header size
-    //Serial.print("DIB Header Size: ");
-    //Serial.println(dibHeaderSize);
 
     // Now read the width and height of the image
     uint32_t bmpWidth = read32(bmpFile);
     int32_t bmpHeight = readS32(bmpFile);  // Read as signed 32-bit integer
-    //Serial.print("Image Width: ");
-    //Serial.println(bmpWidth);
-    //Serial.print("Image Height: ");
-    //Serial.println(bmpHeight);
+
 
     bool topDown = false;  // Flag to check if the image is top-down
     if (bmpHeight < 0) {
@@ -300,8 +291,6 @@ class AbstractGame {
     }
 
     uint16_t depth = read16(bmpFile);  // Color depth
-    //Serial.print("Bit Depth: ");
-    //Serial.println(depth);
 
     if (depth != 24) {  // Only 24-bit BMP supported
       Serial.println("Only 24-bit BMP is supported");
@@ -324,7 +313,7 @@ class AbstractGame {
 
     // Adjust x and y if image is larger than screen
     if (x >= SCREEN_WIDTH || y >= SCREEN_HEIGHT) {
-      Serial.println("Image position out of screen bounds");
+      Serial.println("Image position out of screen bounds"  + SCREEN_WIDTH);
       return;
     }
 
@@ -362,7 +351,6 @@ class AbstractGame {
 
     bmpFile.close();  // Close file when done
     unsigned long endTime = millis();
-    //Serial.println("Finished drawing BMP" + String(filename) + " in "  + String(endTime - startTime) + "ms");
   }
   // Function to get BMP image dimensions
   bool getBMPDimensions(const char *filename, uint32_t &width, uint32_t &height) {
@@ -416,13 +404,10 @@ class AbstractGame {
       xSize = read16(scFile);
       ySize = read16(scFile);
     }
-    //Serial.print("xScale: ");
-    //Serial.println(xScale);
-    //Serial.print("yScale: ");
-    //Serial.println(yScale);
+
     scFile.close();
-    uint8_t radX = radius / xScale;
-    uint8_t radY = radius / yScale;
+    uint8_t radX = max(radius / xScale, 1);
+    uint8_t radY = max(radius / yScale, 1);
 
     bmpFile = SD.open(name + "/" + String(filename) + ".bmp");
     if (!bmpFile) {
@@ -436,29 +421,18 @@ class AbstractGame {
       return;
     }
 
-    // Skip unnecessary BMP header details
-    //Serial.println("BMP signature OK");
+
 
     uint32_t fileSize = read32(bmpFile);
-    //Serial.print("File Size: ");
-    //Serial.println(fileSize);
 
     read32(bmpFile);                         // Reserved bytes (skip)
     uint32_t imageOffset = read32(bmpFile);  // Start of image data
-    //Serial.print("Image Data Offset: ");
-    //Serial.println(imageOffset);
 
     uint32_t dibHeaderSize = read32(bmpFile);  // DIB header size
-    //Serial.print("DIB Header Size: ");
-    //Serial.println(dibHeaderSize);
 
     // Now read the width and height of the image
     uint32_t bmpWidth = read32(bmpFile);
     int32_t bmpHeight = readS32(bmpFile);  // Read as signed 32-bit integer
-    //Serial.print("Image Width: ");
-    //Serial.println(bmpWidth);
-    //Serial.print("Image Height: ");
-    //Serial.println(bmpHeight);
     
 
     bool topDown = false;  // Flag to check if the image is top-down
@@ -474,8 +448,6 @@ class AbstractGame {
     }
 
     uint16_t depth = read16(bmpFile);  // Color depth
-    //Serial.print("Bit Depth: ");
-    //Serial.println(depth);
 
     if (depth != 24) {  // Only 24-bit BMP supported
       Serial.println("Only 24-bit BMP is supported");
@@ -496,23 +468,23 @@ class AbstractGame {
     uint8_t sdbuffer[3 * BUFFPIXEL];  // Buffer for 20 pixels (3 bytes per pixel)
     uint16_t color;
     uint32_t rowSize = (bmpWidth * 3 + 3) & ~3;  // BMP rows are padded to 4-byte boundaries
-
-    if(bmpHeight == 1 && bmpWidth == 1) {//draw 1x1 bmp borders effeciently
+    
+    if(bmpHeight == 1 && bmpWidth == 1) {//draw 1x1 bmp borders effeciently; as the entire image is one color, we can read that color and draw rectangles
       bmpFile.read(sdbuffer, 3);
       uint8_t b = sdbuffer[0];
       uint8_t g = sdbuffer[1];
       uint8_t r = sdbuffer[2];
       color = DIYables_TFT::colorRGB(r, g, b);
-      display.fillRect(x, y, xScale, radY, color);
-      display.fillRect(x, y + radY, radX, yScale, color);
-      display.fillRect(x + xScale - radX, y + radY, radX, yScale, color);
-      display.fillRect(x, y + yScale - radY, xScale, radY, color);
+      display.fillRect(x, y, xScale, radius, color);
+      display.fillRect(x, y + radius, radius, yScale, color);
+      display.fillRect(x + xScale - radius, y + radius, radius, yScale, color);
+      display.fillRect(x, y + yScale - radius, xScale, radius, color);
       return;
     }
 
     // Adjust x and y if image is larger than screen
     if (x >= SCREEN_WIDTH || y >= SCREEN_HEIGHT) {
-      Serial.println("Image position out of screen bounds");
+      Serial.println("Image position out of screen bounds"  + SCREEN_WIDTH);
       return;
     }
 
@@ -537,7 +509,8 @@ class AbstractGame {
           if(r != 1 && g != 1 && b != 1) {
             color = DIYables_TFT::colorRGB(r, g, b);
             // Draw pixel on screen if within bounds
-            drawPixel(x + (col + i) * xScale, y + row * yScale, xScale, yScale, color);
+            //drawPixel(x + (col + i) * xScale, y + row * yScale, xScale, yScale, color);
+            drawPixelInImage(x, y, col + i, row, xScale, yScale, color);
           }
         }
       }
@@ -560,11 +533,12 @@ class AbstractGame {
           if(r != 1 && g != 1 && b != 1) {
             color = DIYables_TFT::colorRGB(r, g, b);
             // Draw pixel on screen if within bounds
-            drawPixel(x + (col + i) * xScale, y + row * yScale, xScale, yScale, color);
+            //drawPixel(x + (col + i) * xScale, y + (row) * yScale, xScale, yScale, color);
+            drawPixelInImage(x, y, col + i, row + radY, xScale, yScale, color);
           }
         }
       }
-      filePosition = imageOffset + rowPos * rowSize + (rowSize - radX * 3);
+      filePosition = imageOffset + rowPos * rowSize - 3 * radX;
       bmpFile.seek(filePosition);
       for (uint32_t col = 0; col < radX; col += BUFFPIXEL) {
         uint32_t pixelsToRead = min(BUFFPIXEL, radX);  // Avoid reading beyond row width
@@ -577,7 +551,8 @@ class AbstractGame {
           if(r != 1 && g != 1 && b != 1) {
             color = DIYables_TFT::colorRGB(r, g, b);
             // Draw pixel on screen if within bounds
-            drawPixel(x + (col + i) * xScale, y + row * yScale, xScale, yScale, color);
+            //drawPixel(x + (col + i) * xScale, y + (row) * yScale, xScale, yScale, color);
+            drawPixelInImage(x, y, col + i + bmpWidth - radX, row + radY, xScale, yScale, color);
           }
         }
       }
@@ -600,7 +575,8 @@ class AbstractGame {
           if(r != 1 && g != 1 && b != 1) {
             color = DIYables_TFT::colorRGB(r, g, b);
             // Draw pixel on screen if within bounds
-            drawPixel(x + (col + i) * xScale, y + row * yScale, xScale, yScale, color);
+            //drawPixel(x + (col + i) * xScale, y + row * yScale, xScale, yScale, color);
+            drawPixelInImage(x, y, col + i, row + bmpHeight - radY, xScale, yScale, color);
           }
         }
       }
