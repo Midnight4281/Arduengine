@@ -65,28 +65,28 @@ CREATING YOUR OWN GAME
   Important note: the screen used does not work well for full-screen refreshes, so any drawing should be on a need-to-draw basis instead of a full refresh every frame
 
   Useful inherited functions from AbstractGame
-  
-    *REQUIRED quitGame(): currently unused, but will be used as a place to save game data (e.g. highscores) when exiting
-    *REQUIRED startGame(): used when game is initialized, use for setup
-    *REQUIRED frameTick(): runs every frame (default 20fps), used for main game loop
-    *REQUIRED getName(): used to set the name of the game for asset lookup
-    *REQUIRED getDisplayName(): used to set the name of the game for the title screen
-    *REQUIRED createGame(flag): used to create a copy of the game on startup. Make sure you copy this from TestGame.h or Minesweeper.h, but change the class inside to your new class.
-    *REQUIRED constructor: ensure you have a constructor for the game. You can change the name of the game in here with name = getName();
-      If you want, in your instructor, you can change the framerate of your game with frameRate = (some number);. This sets the targeted frame rate. If not specified, your game will run at 20 fps. Note that reducing the frame rate is not recommended, as it also reduces the button sample rate. Note that this may be fixed in the future.
+
+      *REQUIRED quitGame(): currently unused, but will be used as a place to save game data (e.g. highscores) when exiting
+      *REQUIRED startGame(): used when game is initialized, use for setup
+      *REQUIRED frameTick(): runs every frame (default 20fps), used for main game loop
+      *REQUIRED getName(): used to set the name of the game for asset lookup
+      *REQUIRED getDisplayName(): used to set the name of the game for the title screen
+      *REQUIRED createGame(flag): used to create a copy of the game on startup. Make sure you copy this from TestGame.h or Minesweeper.h, but change the class inside to your new class.
+      *REQUIRED constructor: ensure you have a constructor for the game. You can change the name of the game in here with name = getName();
+        If you want, in your instructor, you can change the framerate of your game with frameRate = (some number);. This sets the targeted frame rate. If not specified, your game will run at 20 fps. Note that reducing the frame rate is not recommended, as it also reduces the button sample rate. Note that this may be fixed in the future.
+      changeSeed(): reseeds the rand() function to a random seed
+      drawBMP(filename, x, y): draws a BMP from the SD card at the x and y position
+      drawBMPArea(filename, x, y, xAmt, yAmt): draws a grid of identical images at (x, y) with xAmt and yAmt being how many rows and columns
+        Faster than using drawBMP repeatedly
+      drawBorderBMP(filename, x, y, radius): draws the edge of a BMP at (x, y). The edge is as thick as the radius parameter in screen-space
+      readSaveFile(pos): returns an unsigned 16-bit integer at that position in the save file. If the save file is too short, or cannot find the file, returns 0.
+      editSaveFile(pos, val): overwrites the value of a uint16_t at the specified position.
+      appendSaveFile(val): appends a uint16_t to the end of the save file.
+      writeToSave(pos, val): automatically uses appendSaveFile() and editSaveFile() to ensure that the file is edited correctly. It is HIGHLY recommended to use this instead of manually picking editSaveFile() and appendSaveFile(). It will also fill any gaps in your file to avoid crashing. Note that entering an obscenely large file position may cause issues with RAM, so sticking to smaller values is recommended when possible.
 
     YOUR CONSTRUCTOR MUST HAVE THE FOLLOWING PARAMETER: YourClass(bool* flag) : AbstractGame(flag) {} This ensures that the game can properly inform the arduino when it has finished and needs to quit.
 
-    changeSeed(): reseeds the rand() function to a random seed
-    drawBMP(filename, x, y): draws a BMP from the SD card at the x and y position
-    drawBMPArea(filename, x, y, xAmt, yAmt): draws a grid of identical images at (x, y) with xAmt and yAmt being how many rows and columns
-      Faster than using drawBMP repeatedly
-    drawBorderBMP(filename, x, y, radius): draws the edge of a BMP at (x, y). The edge is as thick as the radius parameter in screen-space
-
-    readSaveFile(pos): returns an unsigned 16-bit integer at that position in the save file. If the save file is too short, or cannot find the file, returns 0.
-    editSaveFile(pos, val): overwrites the value of a uint16_t at the specified position.
-    appendSaveFile(val): appends a uint16_t to the end of the save file.
-    writeToSave(pos, val): automatically uses appendSaveFile() and editSaveFile() to ensure that the file is edited correctly. It is HIGHLY recommended to use this instead of manually picking editSaveFile() and appendSaveFile(). It will also fill any gaps in your file to avoid crashing. Note that entering an obscenely large file position may cause issues with RAM, so sticking to smaller values is recommended when possible.
+   
 
     Your save file for your game is stored on the SD card at gameName/gameName.sv. Currently, this path cannot be changed. For manual editing, I recommend Notepad++ with the Hex editor plugin. You do not need to create this file manually, it is handled automatically at runtime. This save file persists on the SD card and is not forgotten unless overwritten.
 
