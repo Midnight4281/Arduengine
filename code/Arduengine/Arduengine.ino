@@ -3,6 +3,7 @@
 #include "AbstractGame.h"
 #include "TestGame.h"
 #include "Minesweeper.h"
+#include "Snake.h"
 #include "ButtonManager.h"
 #include <DIYables_TFT_Shield.h>
 
@@ -30,11 +31,13 @@ ButtonManager buttons;
 
 GameCreateList createGameList[] = {
   &Minesweeper::createGame,
-  &TestGame::createGame
+  &TestGame::createGame,
+  &SnakeGame::createGame
 };
 StringGameList nameGameList[] = {
   &Minesweeper::getDisplayName,
-  &TestGame::getDisplayName
+  &TestGame::getDisplayName,
+  &SnakeGame::getDisplayName
 };
 
 AbstractGame* game;
@@ -106,22 +109,22 @@ void setGameSelectionText() {
 void setCurrentGame() {
   game = createGameList[currentGameSelection](&gameWasDeleted);
   game->gameSetup(&buttons, display);
+  frameRate = game->getFrameRate();
 }
 void loop()
 {
   unsigned long startFrameTime = millis();
-  /*
-  Serial.print(F("Free RAM: "));
-  printFreeRam();
-  */
+  
+  //Serial.print(F("Free RAM: "));
+  //printFreeRam();
   
   bool b[8];
   for(int i = 0; i < 8; i++) {
     b[7 - i] = !pcf.digitalRead(i); // set each bool to be if the corresponding button is pressed
   }
   buttons.passInputs(b);
+
   if(game != nullptr) {
-    //game->passInputs(b);
     game->frameTick();
     if(buttons.getButtonWentDown("-")) {
       game->exitGame();
@@ -129,6 +132,12 @@ void loop()
     if(gameWasDeleted) {
       game = nullptr;
       setGameSelectionText();
+      bool b[8];
+      for(int i = 0; i < 8; i++) {
+        b[7 - i] = false;
+      }
+      buttons.passInputs(b);
+      delay(1000);
     }
   } else {//handle main menu calculations
     if(buttons.getButtonWentDown("L")) {
@@ -137,7 +146,6 @@ void loop()
       } else {
         currentGameSelection = numberOfGames - 1;
       }
-      Serial.println(currentGameSelection);
       setGameSelectionText();
     } else if (buttons.getButtonWentDown("R")) {
       if(currentGameSelection >= numberOfGames - 1) {
@@ -145,7 +153,6 @@ void loop()
       } else {
         currentGameSelection++;
       }
-      Serial.println(currentGameSelection);
       setGameSelectionText();
     } else if (buttons.getButtonWentDown("+")) {
       setCurrentGame();
@@ -153,5 +160,6 @@ void loop()
   }
   unsigned long endFrameTime = millis();
   float duration = endFrameTime - startFrameTime;
-  delay(max(1000 / frameRate - duration, 1));
+  //delay(max(1000 / frameRate - duration, 1));
+  delay(1000 / frameRate);
 }

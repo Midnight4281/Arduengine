@@ -24,6 +24,9 @@ class Board {
     int16_t getXAtNumeric(uint32_t i) {
       return i % _maxX;
     }
+    int16_t moveNumericByDir(uint32_t i, uint16_t xd, uint16_t yd) {
+      return getNumericAtPos(getXAtNumeric(i) + xd, getYAtNumeric(i) + yd);
+    }
     int16_t getNumericAtPos(uint16_t x, uint16_t y) {
       return x + y * _maxX;
     }

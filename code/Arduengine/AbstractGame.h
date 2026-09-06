@@ -11,7 +11,7 @@
 #define ABSTRACT_GAME_H
 class AbstractGame {
   protected:
-    int frameRate;
+    uint8_t frameRate;
     const int seed_addr = 0;
     unsigned long seed;
     bool* _isDeletedFlag;
@@ -33,6 +33,7 @@ class AbstractGame {
     DIYables_TFT_ILI9486_Shield display;
     File bmpFile;
     File scFile;
+    File saveFile;
     uint16_t SCREEN_WIDTH;
     uint16_t SCREEN_HEIGHT;
     
@@ -66,12 +67,21 @@ class AbstractGame {
       EEPROM.write(seed_addr, seed+1);
       randomSeed(seed);
     }
+    void clearScreen() {
+      display.fillScreen(DIYables_TFT::colorRGB(0, 0, 0));
+    }
     float randomFloatRange(float minVal, float maxVal) {
       return minVal + (random(0, 1000000) / 1000000.0) * (maxVal - minVal);
     }
     virtual void frameTick() = 0;
-    int getFrameRate() {return frameRate;}
-    uint16_t read16(File &f) {
+    uint8_t getFrameRate() {
+      if(frameRate != 0) {
+        return frameRate;
+      } else {
+        return 20;
+      }
+    }
+  uint16_t read16(File &f) {
     uint16_t result;
     result = f.read();
     result |= (f.read() << 8);
@@ -107,6 +117,55 @@ class AbstractGame {
   }
   void drawPixelInImage(int16_t x, int16_t y, uint8_t xd, uint8_t yd, uint8_t xs, uint8_t ys, uint16_t color) {
     drawPixel(x + (xd * xs), y + (yd * ys), xs, ys, color);
+  }
+  uint16_t readSaveFile(uint16_t pos) {
+    saveFile = SD.open(name + "/" + name + ".sv");
+    if(!saveFile) {
+      return 0;
+    }
+    unsigned long fileLength = saveFile.size();
+    Serial.println(fileLength);
+    if(fileLength <= pos * 2) {
+      Serial.println("returning 0");
+      saveFile.close();
+      return 0;
+    }
+    saveFile.seek(pos * 2);
+    uint16_t toReturn = makeWord(saveFile.read(), saveFile.read());
+    saveFile.close();
+    return(toReturn);
+  }
+  void editSaveFile(uint16_t pos, uint16_t val) {
+    saveFile = SD.open(name + "/" + name + ".sv", O_RDWR);
+    if(!saveFile) {
+      return;
+    }
+    saveFile.seek(pos * 2);
+    saveFile.write(highByte(val));
+    saveFile.write(lowByte(val));
+    saveFile.close();
+  }
+  void appendSaveFile(uint16_t val) {
+    saveFile = SD.open(name + "/" + name + ".sv", FILE_WRITE);
+    if(!saveFile) {
+      return;
+    }
+    saveFile.write(highByte(val));
+    saveFile.write(lowByte(val));
+    saveFile.close();
+  }
+  void writeToSave(uint16_t pos, uint16_t val) {
+    saveFile = SD.open(name + "/" + name + ".sv", FILE_WRITE);
+    unsigned long fileLength = saveFile.size() / 2;
+    saveFile.close();
+    if(fileLength >= pos) {
+      editSaveFile(pos, val);
+    } else {
+      for(int i = 0; i < pos - fileLength; i++) {
+        appendSaveFile(0);
+      }
+      editSaveFile(pos, val);
+    }
   }
 
   // Function to draw BMP from SD card
@@ -250,7 +309,6 @@ class AbstractGame {
       ySize = read16(scFile);
     }
     scFile.close();
-    Serial.println("Found sc file");
     bmpFile = SD.open(name + "/" + String(filename) + ".bmp");
 
     if (!bmpFile) {
@@ -351,6 +409,7 @@ class AbstractGame {
 
     bmpFile.close();  // Close file when done
     unsigned long endTime = millis();
+    Serial.println("Finshed drawing bmp area in " + String(endTime - startTime) + "ms");
   }
   // Function to get BMP image dimensions
   bool getBMPDimensions(const char *filename, uint32_t &width, uint32_t &height) {

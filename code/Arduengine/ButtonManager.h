@@ -11,7 +11,7 @@ class ButtonManager {
   public:
     int buttonHeldTimes[8];
     int buttonLastHeldTimes[8];
-    String n;
+    String n = "Hello";
     int searchKeys(String tar) {
       int arraySize = 8;
       for (int i = 0; i < arraySize; i++) {

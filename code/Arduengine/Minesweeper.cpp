@@ -3,6 +3,7 @@
 void Minesweeper::frameTick() {
   int16_t x = board.getXAtNumeric(currentPos);
   int16_t y = board.getYAtNumeric(currentPos);
+  Serial.println("Started frame tick");
   if(buttons->getButtonWentDown("L")) {
     if(board.movementIsOnBoard(x, y, -1, 0)) {
       drawTile(currentPos, false, true, false);
@@ -179,6 +180,7 @@ void Minesweeper::reset() {
     }
   }
   drawBMPArea("hidden", 0, 0, xSize, ySize);
+  
   drawTile(currentPos, false, true, true);
   display.fillRect(20, 390, 300, 25, DIYables_TFT::colorRGB(0, 0, 0));
   display.setTextColor(DIYables_TFT::colorRGB(255, 255, 255));
