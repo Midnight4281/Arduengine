@@ -84,11 +84,9 @@ CREATING YOUR OWN GAME
       appendSaveFile(val): appends a uint16_t to the end of the save file.
       writeToSave(pos, val): automatically uses appendSaveFile() and editSaveFile() to ensure that the file is edited correctly. It is HIGHLY recommended to use this instead of manually picking editSaveFile() and appendSaveFile(). It will also fill any gaps in your file to avoid crashing. Note that entering an obscenely large file position may cause issues with RAM, so sticking to smaller values is recommended when possible.
 
-    YOUR CONSTRUCTOR MUST HAVE THE FOLLOWING PARAMETER: YourClass(bool* flag) : AbstractGame(flag) {} This ensures that the game can properly inform the arduino when it has finished and needs to quit.
+  YOUR CONSTRUCTOR MUST HAVE THE FOLLOWING PARAMETER: YourClass(bool* flag) : AbstractGame(flag) {} This ensures that the game can properly inform the arduino when it has finished and needs to quit.
 
-   
-
-    Your save file for your game is stored on the SD card at gameName/gameName.sv. Currently, this path cannot be changed. For manual editing, I recommend Notepad++ with the Hex editor plugin. You do not need to create this file manually, it is handled automatically at runtime. This save file persists on the SD card and is not forgotten unless overwritten.
+  Your save file for your game is stored on the SD card at gameName/gameName.sv. Currently, this path cannot be changed. For manual editing, I recommend Notepad++ with the Hex editor plugin. You do not need to create this file manually, it is handled automatically at runtime. This save file persists on the SD card and is not forgotten unless overwritten.
 
 
   Useful inherited variables
