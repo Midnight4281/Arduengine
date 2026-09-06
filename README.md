@@ -91,6 +91,7 @@ CREATING YOUR OWN GAME
 
 
   Useful inherited variables
+  
     buttons: used for player input, see the ButtonManager class for all functions
       Note that because Buttons are referenced via a pointer, in order to call its functions, you must use (buttons->function())
       For all functions starting with "get", you can enter either a keycode or an integer 0-7. The keycode will search for the respective value, and the integer will return the key listed in the KeyCodes array.
