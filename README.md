@@ -65,6 +65,7 @@ CREATING YOUR OWN GAME
   Important note: the screen used does not work well for full-screen refreshes, so any drawing should be on a need-to-draw basis instead of a full refresh every frame
 
   Useful inherited functions from AbstractGame
+  
     *REQUIRED quitGame(): currently unused, but will be used as a place to save game data (e.g. highscores) when exiting
     *REQUIRED startGame(): used when game is initialized, use for setup
     *REQUIRED frameTick(): runs every frame (default 20fps), used for main game loop
@@ -91,7 +92,7 @@ CREATING YOUR OWN GAME
 
 
   Useful inherited variables
-  
+
     buttons: used for player input, see the ButtonManager class for all functions
       Note that because Buttons are referenced via a pointer, in order to call its functions, you must use (buttons->function())
       For all functions starting with "get", you can enter either a keycode or an integer 0-7. The keycode will search for the respective value, and the integer will return the key listed in the KeyCodes array.
