@@ -3,7 +3,6 @@
 void Minesweeper::frameTick() {
   int16_t x = board.getXAtNumeric(currentPos);
   int16_t y = board.getYAtNumeric(currentPos);
-  Serial.println("Started frame tick");
   if(buttons->getButtonWentDown("L")) {
     if(board.movementIsOnBoard(x, y, -1, 0)) {
       drawTile(currentPos, false, true, false);
@@ -130,17 +129,17 @@ void Minesweeper::drawTile(int16_t tile, bool drawMiddle, bool drawBorder, bool 
         //draw the border of the respective empty sprite
         if(v >= 0) {
           if(v >= 30) {
-            drawBorderBMP("flag", xDraw, yDraw, 4);
+            drawBorderBMP("flag", xDraw, yDraw, 4, true);
           } else if(v > 18) {
-            drawBorderBMP("mine", xDraw, yDraw, 4);
+            drawBorderBMP("mine", xDraw, yDraw, 4, true);
           } else if (v >= 10){
             if(v == 10) {
-              drawBorderBMP("tile_0", xDraw, yDraw, 4);
+              drawBorderBMP("tile_0", xDraw, yDraw, 4, true);
             } else {
-              drawBorderBMP(("tile_" + String(v - 10)).c_str(), xDraw, yDraw, 4);
+              drawBorderBMP(("tile_" + String(v - 10)).c_str(), xDraw, yDraw, 4, true);
             }
           } else {
-            drawBorderBMP("hidden", xDraw, yDraw, 4);
+            drawBorderBMP("hidden", xDraw, yDraw, 4, true);
           }
         }
       }

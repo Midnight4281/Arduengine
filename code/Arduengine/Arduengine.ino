@@ -4,6 +4,7 @@
 #include "TestGame.h"
 #include "Minesweeper.h"
 #include "Snake.h"
+#include "DebugGame.h"
 #include "ButtonManager.h"
 #include <DIYables_TFT_Shield.h>
 
@@ -32,12 +33,14 @@ ButtonManager buttons;
 GameCreateList createGameList[] = {
   &Minesweeper::createGame,
   &TestGame::createGame,
-  &SnakeGame::createGame
+  &SnakeGame::createGame,
+  &DebugGame::createGame
 };
 StringGameList nameGameList[] = {
   &Minesweeper::getDisplayName,
   &TestGame::getDisplayName,
-  &SnakeGame::getDisplayName
+  &SnakeGame::getDisplayName,
+  &DebugGame::getDisplayName
 };
 
 AbstractGame* game;

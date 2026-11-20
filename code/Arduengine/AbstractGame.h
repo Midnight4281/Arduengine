@@ -3,6 +3,7 @@
 #include <EEPROM.h>
 #include <DIYables_TFT_Shield.h>
 #include <SD.h>
+#include <ArduinoJson.h>
 
 #define BUFFPIXEL 20  // Buffer size remains the same
 #define SD_CS 10
@@ -32,6 +33,15 @@ class AbstractGame {
 
     DIYables_TFT_ILI9486_Shield display;
     File bmpFile;
+    uint32_t fileSize;
+    uint32_t imageOffset;
+    uint32_t dibHeaderSize;
+    uint32_t bmpWidth;
+    int32_t bmpHeight;
+    bool topDown;
+    uint16_t planes;
+    uint16_t depth;
+
     File scFile;
     File saveFile;
     uint16_t SCREEN_WIDTH;
@@ -167,14 +177,17 @@ class AbstractGame {
       editSaveFile(pos, val);
     }
   }
+  JsonDocument readTextFromJson(const char *filename) {
+    File configFile = SD.open(name + "/jsonStorage/" + filename + ".json");
+    JsonDocument doc;
+    DeserializationError error = deserializeJson(doc, configFile);
+    configFile.close();
+    return doc;
+  }
 
-  // Function to draw BMP from SD card
-  void drawBMP(const char *filename, int x, int y) {
-    unsigned long startTime = millis();
+  void drawBMPSector(const char *filename, int x, int y, uint16_t sx, uint16_t sy, uint16_t tx, uint16_t ty, bool openFile = true, bool closeFile = true) {
     uint16_t xScale;
-
     uint16_t yScale;
-
     scFile = SD.open(name + "/" + String(filename) + ".sc");
     if (!scFile) {
       Serial.println("Could not find SC " + String(filename));
@@ -185,63 +198,11 @@ class AbstractGame {
       yScale = read16(scFile);
     }
     scFile.close();
-
-    bmpFile = SD.open(name + "/" + String(filename) + ".bmp");
-
-    if (!bmpFile) {
-      Serial.println("File not found");
-      return;
-    }
-
-    if (read16(bmpFile) != 0x4D42) {  // Check BMP signature
-      Serial.println("Not a BMP file");
-      bmpFile.close();
-      return;
-    }
-
-    // Skip unnecessary BMP header details
-
-    uint32_t fileSize = read32(bmpFile);
-
-
-    read32(bmpFile); //skip bytes
-    
-
-    uint32_t imageOffset = read32(bmpFile);  // Start of image data
-
-
-    uint32_t dibHeaderSize = read32(bmpFile);  // DIB header size
-
-    // Now read the width and height of the image
-    uint32_t bmpWidth = read32(bmpFile);
-    int32_t bmpHeight = readS32(bmpFile);  // Read as signed 32-bit integer
-
-
-    bool topDown = false;  // Flag to check if the image is top-down
-    if (bmpHeight < 0) {
-      bmpHeight = -bmpHeight;  // Make height positive for processing
-      topDown = true;          // Mark the BMP as top-down
-    }
-
-    if (read16(bmpFile) != 1) {  // Planes must be 1
-      Serial.println("Invalid BMP file");
-      bmpFile.close();
-      return;
-    }
-
-    uint16_t depth = read16(bmpFile);  // Color depth
-
-
-    if (depth != 24) {  // Only 24-bit BMP supported
-      Serial.println("Only 24-bit BMP is supported");
-      bmpFile.close();
-      return;
-    }
-
-    if (read32(bmpFile) != 0) {  // No compression
-      Serial.println("Unsupported BMP compression");
-      bmpFile.close();
-      return;
+    if(openFile) {
+      verifyBMP(filename, true, false);
+    } else {
+      bmpFile.seek(0);
+      read16(bmpFile);
     }
 
     // Move to the start of the image data
@@ -257,14 +218,14 @@ class AbstractGame {
       return;
     }
 
-    uint32_t maxRow = min(bmpHeight, SCREEN_HEIGHT - y);
-    uint32_t maxCol = min(bmpWidth, SCREEN_WIDTH - x);
+    uint32_t maxRow = min(ty - sy, SCREEN_HEIGHT - y);
+    uint32_t maxCol = min(tx - sx, SCREEN_WIDTH - x);
 
     // Draw the image
     for (uint32_t row = 0; row < maxRow; row++) {
-      int32_t rowPos = topDown ? row : bmpHeight - 1 - row;  // Adjust for top-down BMPs
+      int32_t rowPos = topDown ? row + sy : bmpHeight - 1 - row - sy;  // Adjust for top-down BMPs
 
-      uint32_t filePosition = imageOffset + rowPos * rowSize;
+      uint32_t filePosition = imageOffset + (rowPos) * rowSize + sx * 3;
       bmpFile.seek(filePosition);  // Move to the correct row
 
       for (uint32_t col = 0; col < maxCol; col += BUFFPIXEL) {
@@ -277,16 +238,24 @@ class AbstractGame {
           uint8_t r = sdbuffer[i * 3 + 2];
           if(r != 1 && g != 1 && b != 1) {
             color = DIYables_TFT::colorRGB(r, g, b);
-
-            drawPixel(x + (col + i) * xScale, y + row * yScale, xScale, yScale, color);
+            drawPixel(x + (col + i + sx) * xScale, y + (row + sy) * yScale, xScale, yScale, color);
           }
         }
       }
     }
-
-    bmpFile.close();  // Close file when done
+    if(closeFile) {
+      bmpFile.close();  // Close file when done
+    }
     unsigned long endTime = millis();
   }
+
+  // Function to draw BMP from SD card
+  void drawBMP(const char *filename, int x, int y) {
+    if (verifyBMP(filename, true, false)) {
+      drawBMPSector(filename, x, y, 0, 0, bmpWidth, bmpHeight, false, true);
+    }
+  }
+  //Function to draw a grid of the same BMP images
   void drawBMPArea(const char *filename, int x, int y, int xAmt, int yAmt) {
     Serial.println("Started drawing bmp area");
     unsigned long startTime = millis();
@@ -412,46 +381,63 @@ class AbstractGame {
     Serial.println("Finshed drawing bmp area in " + String(endTime - startTime) + "ms");
   }
   // Function to get BMP image dimensions
-  bool getBMPDimensions(const char *filename, uint32_t &width, uint32_t &height) {
-    File scFile = SD.open(name + "/" + String(filename) + ".sc");
-    File bmpFile = SD.open(name + "/" + String(filename) + ".bmp");
-    if (!bmpFile) {
-      Serial.println("File not found");
-      return false;
+  bool verifyBMP(const char *filename, bool openFile = true, bool closeFile = true) {
+    if(openFile) {
+      bmpFile = SD.open(name + "/" + String(filename) + ".bmp");
+      if (!bmpFile) {
+        Serial.println("File not found");
+        return false;
+      }
+      if (read16(bmpFile) != 0x4D42) {  // Check BMP signature
+        Serial.println("Not a BMP file");
+        bmpFile.close();
+        return false;
+      }
+    } else {
+      bmpFile.seek(0);
+      read16(bmpFile);
     }
 
-    if (read16(bmpFile) != 0x4D42) {  // Check BMP signature
-      Serial.println("Not a BMP file");
+    // Skip unnecessary BMP header details
+    fileSize = read32(bmpFile);
+    read32(bmpFile); //skip bytes
+    imageOffset = read32(bmpFile);  // Start of image data
+
+    dibHeaderSize = read32(bmpFile);  // DIB header size
+
+    // Now read the width and height of the image
+    bmpWidth = read32(bmpFile);
+    bmpHeight = readS32(bmpFile);  // Read as signed 32-bit integer
+
+    topDown = false;  // Flag to check if the image is top-down
+    if (bmpHeight < 0) {
+      bmpHeight = -bmpHeight;  // Make height positive for processing
+      topDown = true;          // Mark the BMP as top-down
+    }
+    planes = read16(bmpFile);
+    //Serial.println("Planes: " + String(planes));
+    if (planes != 1) {  // Planes must be 1
+      Serial.println("Invalid BMP file");
       bmpFile.close();
       return false;
     }
-
-    read32(bmpFile);  // Skip file size
-    read32(bmpFile);
-    
-    uint32_t imageOffset = read32(bmpFile);  // Start of image data
-
-    uint32_t dibHeaderSize = read32(bmpFile);  // DIB header size
-
-    // Read the width and height of the image
-    read32(scFile);
-    
-
-    width = read16(scFile);
-    height = read16(scFile);
-
-    bmpFile.close();  // Close the file
-    scFile.close();
-    return true;      // Success
+    depth = read16(bmpFile);  // Color depth
+    if (depth != 24) {  // Only 24-bit BMP supported
+      Serial.println("Only 24-bit BMP is supported");
+      bmpFile.close();
+      return false;
+    }
+    if (read32(bmpFile) != 0) {  // No compression
+      Serial.println("Unsupported BMP compression");
+      bmpFile.close();
+      return false;
+    }
+    if(closeFile) {
+      bmpFile.close();  // Close the file
+    }
+    return true;
   }
-  void drawBorderBMP(const char *filename, int x, int y, uint8_t radius) {
-    unsigned long startTime = millis();
-    uint16_t xScale;
-    uint16_t yScale;
-
-    uint16_t xSize;
-    uint16_t ySize;
-
+  bool getSCDimensions(const char *filename, uint16_t &xScale, uint16_t &yScale) {
     scFile = SD.open(name + "/" + String(filename) + ".sc");
     if (!scFile) {
       Serial.println("Could not find SC");
@@ -460,191 +446,62 @@ class AbstractGame {
     } else {
       xScale = read16(scFile);
       yScale = read16(scFile);
-      xSize = read16(scFile);
-      ySize = read16(scFile);
     }
+    scFile.close(); // Close the file
+    return true;      // Success
+  }
+  /*Filename: name of file, automatically sorts for the correct folder
+  x: x position
+  y: y position
+  radius: how many pixels in to search
+  borderOutsideBorderColorConstant: draws the entire border on the first color read*/
+  void drawBorderBMP(const char *filename, int x, int y, uint8_t radius, bool knownOutsideBorderColorConstant = false) {
+    unsigned long startTime = millis();
+    uint16_t xScale, yScale;
+    uint16_t xSize, ySize;
 
-    scFile.close();
+    getSCDimensions(filename, xScale, yScale);
+
     uint8_t radX = max(radius / xScale, 1);
     uint8_t radY = max(radius / yScale, 1);
+    if(verifyBMP(filename, true, false)) {
+      if(bmpHeight == 1 && bmpWidth == 1 || knownOutsideBorderColorConstant) {//draw 1x1 bmp borders effeciently; as the entire image is one color, we can read that color and draw rectangles
+        bmpFile.seek(imageOffset);
 
-    bmpFile = SD.open(name + "/" + String(filename) + ".bmp");
-    if (!bmpFile) {
-      Serial.println("File not found");
-      return;
-    }
-
-    if (read16(bmpFile) != 0x4D42) {  // Check BMP signature
-      Serial.println("Not a BMP file");
-      bmpFile.close();
-      return;
-    }
-
-
-
-    uint32_t fileSize = read32(bmpFile);
-
-    read32(bmpFile);                         // Reserved bytes (skip)
-    uint32_t imageOffset = read32(bmpFile);  // Start of image data
-
-    uint32_t dibHeaderSize = read32(bmpFile);  // DIB header size
-
-    // Now read the width and height of the image
-    uint32_t bmpWidth = read32(bmpFile);
-    int32_t bmpHeight = readS32(bmpFile);  // Read as signed 32-bit integer
-    
-
-    bool topDown = false;  // Flag to check if the image is top-down
-    if (bmpHeight < 0) {
-      bmpHeight = -bmpHeight;  // Make height positive for processing
-      topDown = true;          // Mark the BMP as top-down
-    }
-
-    if (read16(bmpFile) != 1) {  // Planes must be 1
-      Serial.println("Invalid BMP file");
-      bmpFile.close();
-      return;
-    }
-
-    uint16_t depth = read16(bmpFile);  // Color depth
-
-    if (depth != 24) {  // Only 24-bit BMP supported
-      Serial.println("Only 24-bit BMP is supported");
-      bmpFile.close();
-      return;
-    }
-
-    if (read32(bmpFile) != 0) {  // No compression
-      Serial.println("Unsupported BMP compression");
-      bmpFile.close();
-      return;
-    }
-    
-
-    // Move to the start of the image data
-    bmpFile.seek(imageOffset);
-
-    uint8_t sdbuffer[3 * BUFFPIXEL];  // Buffer for 20 pixels (3 bytes per pixel)
-    uint16_t color;
-    uint32_t rowSize = (bmpWidth * 3 + 3) & ~3;  // BMP rows are padded to 4-byte boundaries
-    
-    if(bmpHeight == 1 && bmpWidth == 1) {//draw 1x1 bmp borders effeciently; as the entire image is one color, we can read that color and draw rectangles
-      bmpFile.read(sdbuffer, 3);
-      uint8_t b = sdbuffer[0];
-      uint8_t g = sdbuffer[1];
-      uint8_t r = sdbuffer[2];
-      color = DIYables_TFT::colorRGB(r, g, b);
-      display.fillRect(x, y, xScale, radius, color);
-      display.fillRect(x, y + radius, radius, yScale, color);
-      display.fillRect(x + xScale - radius, y + radius, radius, yScale, color);
-      display.fillRect(x, y + yScale - radius, xScale, radius, color);
-      return;
-    }
-
-    // Adjust x and y if image is larger than screen
-    if (x >= SCREEN_WIDTH || y >= SCREEN_HEIGHT) {
-      Serial.println("Image position out of screen bounds"  + SCREEN_WIDTH);
-      return;
-    }
-
-    uint32_t maxRow = min(bmpHeight, SCREEN_HEIGHT - y);
-    uint32_t maxCol = min(bmpWidth, SCREEN_WIDTH - x);
-
-    // Draw the top row
-    for (uint32_t row = 0; row < radY; row++) {
-      int32_t rowPos = topDown ? row : bmpHeight - 1 - row;  // Adjust for top-down BMPs
-
-      uint32_t filePosition = imageOffset + rowPos * rowSize;
-      bmpFile.seek(filePosition);  // Move to the correct row
-      
-      for (uint32_t col = 0; col < maxCol; col += BUFFPIXEL) {
-        uint32_t pixelsToRead = min(BUFFPIXEL, maxCol - col);  // Avoid reading beyond row width
-        bmpFile.read(sdbuffer, 3 * pixelsToRead);              // Read multiple pixels at once
-
-        for (uint32_t i = 0; i < pixelsToRead; i++) {
-          uint8_t b = sdbuffer[i * 3];
-          uint8_t g = sdbuffer[i * 3 + 1];
-          uint8_t r = sdbuffer[i * 3 + 2];
-          if(r != 1 && g != 1 && b != 1) {
-            color = DIYables_TFT::colorRGB(r, g, b);
-            // Draw pixel on screen if within bounds
-            //drawPixel(x + (col + i) * xScale, y + row * yScale, xScale, yScale, color);
-            drawPixelInImage(x, y, col + i, row, xScale, yScale, color);
-          }
+        uint8_t sdbuffer[3 * BUFFPIXEL];  // Buffer for 20 pixels (3 bytes per pixel)
+        uint16_t color;
+        uint32_t rowSize = (bmpWidth * 3 + 3) & ~3;  // BMP rows are padded to 4-byte boundaries
+        bmpFile.read(sdbuffer, 3);
+        uint8_t b = sdbuffer[0];
+        uint8_t g = sdbuffer[1];
+        uint8_t r = sdbuffer[2];
+        color = DIYables_TFT::colorRGB(r, g, b);
+        display.fillRect(x, y, xScale * bmpWidth, radius, color);
+        display.fillRect(x, y + radius, radius, yScale * bmpHeight, color);
+        display.fillRect(x + xScale * bmpWidth - radius, y + radius, radius, yScale * bmpHeight, color);
+        display.fillRect(x, y + yScale * bmpHeight - radius, xScale * bmpWidth, radius, color);
+        return;
+      } else {//standard, detailed border drawing
+        // Adjust x and y if image is larger than screen
+        if (x >= SCREEN_WIDTH || y >= SCREEN_HEIGHT) {
+          Serial.println("Image position out of screen bounds"  + SCREEN_WIDTH);
+          return;
         }
+
+        uint32_t maxRow = min(bmpHeight, SCREEN_HEIGHT - y);
+        uint32_t maxCol = min(bmpWidth, SCREEN_WIDTH - x);
+        Serial.println("Width: " + String(bmpWidth));
+        Serial.println("Height: " + String(bmpHeight));
+        Serial.println("RadX: " + String(radX));
+        Serial.println("RadY: " + String(radY));
+        drawBMPSector(filename, x, y, 0, 0, bmpWidth, radY, false, false);
+        drawBMPSector(filename, x, y, 0, radY, radX, bmpHeight - radY, false, false);
+        drawBMPSector(filename, x, y, bmpWidth - radX, radY, bmpWidth, bmpHeight - radY, false, false);
+        drawBMPSector(filename, x, y, 0, bmpHeight - radY, bmpWidth, bmpHeight, false, false);
+        
+        bmpFile.close();  // Close file when done
       }
     }
-    //draw the sides
-    for (uint32_t row = 0; row < maxRow - radY * 2; row++) {
-      int32_t rowPos = topDown ? row + radY : bmpHeight - 1 - row - radY;  // Adjust for top-down BMPs
-
-      uint32_t filePosition = imageOffset + rowPos * rowSize;
-      bmpFile.seek(filePosition);  // Move to the correct row
-      
-      for (uint32_t col = 0; col < radX; col += BUFFPIXEL) {
-        uint32_t pixelsToRead = min(BUFFPIXEL, radX);  // Avoid reading beyond row width
-        bmpFile.read(sdbuffer, 3 * pixelsToRead);              // Read multiple pixels at once
-
-        for (uint32_t i = 0; i < pixelsToRead; i++) {
-          uint8_t b = sdbuffer[i * 3];
-          uint8_t g = sdbuffer[i * 3 + 1];
-          uint8_t r = sdbuffer[i * 3 + 2];
-          if(r != 1 && g != 1 && b != 1) {
-            color = DIYables_TFT::colorRGB(r, g, b);
-            // Draw pixel on screen if within bounds
-            //drawPixel(x + (col + i) * xScale, y + (row) * yScale, xScale, yScale, color);
-            drawPixelInImage(x, y, col + i, row + radY, xScale, yScale, color);
-          }
-        }
-      }
-      filePosition = imageOffset + rowPos * rowSize - 3 * radX;
-      bmpFile.seek(filePosition);
-      for (uint32_t col = 0; col < radX; col += BUFFPIXEL) {
-        uint32_t pixelsToRead = min(BUFFPIXEL, radX);  // Avoid reading beyond row width
-        bmpFile.read(sdbuffer, 3 * pixelsToRead);              // Read multiple pixels at once
-
-        for (uint32_t i = 0; i < pixelsToRead; i++) {
-          uint8_t b = sdbuffer[i * 3];
-          uint8_t g = sdbuffer[i * 3 + 1];
-          uint8_t r = sdbuffer[i * 3 + 2];
-          if(r != 1 && g != 1 && b != 1) {
-            color = DIYables_TFT::colorRGB(r, g, b);
-            // Draw pixel on screen if within bounds
-            //drawPixel(x + (col + i) * xScale, y + (row) * yScale, xScale, yScale, color);
-            drawPixelInImage(x, y, col + i + bmpWidth - radX, row + radY, xScale, yScale, color);
-          }
-        }
-      }
-    }
-    //draw the bottom row
-    for (uint32_t row = 0; row < radY; row++) {
-      int32_t rowPos = topDown ? (row + maxRow - radY): (row + maxRow - radY);  // Adjust for top-down BMPs
-
-      uint32_t filePosition = imageOffset + rowPos * rowSize;
-      bmpFile.seek(filePosition);  // Move to the correct row
-      
-      for (uint32_t col = 0; col < maxCol; col += BUFFPIXEL) {
-        uint32_t pixelsToRead = min(BUFFPIXEL, maxCol - col);  // Avoid reading beyond row width
-        bmpFile.read(sdbuffer, 3 * pixelsToRead);              // Read multiple pixels at once
-
-        for (uint32_t i = 0; i < pixelsToRead; i++) {
-          uint8_t b = sdbuffer[i * 3];
-          uint8_t g = sdbuffer[i * 3 + 1];
-          uint8_t r = sdbuffer[i * 3 + 2];
-          if(r != 1 && g != 1 && b != 1) {
-            color = DIYables_TFT::colorRGB(r, g, b);
-            // Draw pixel on screen if within bounds
-            //drawPixel(x + (col + i) * xScale, y + row * yScale, xScale, yScale, color);
-            drawPixelInImage(x, y, col + i, row + bmpHeight - radY, xScale, yScale, color);
-          }
-        }
-      }
-    }
-    
-    
-    bmpFile.close();  // Close file when done
-    unsigned long endTime = millis();
-    //Serial.println("Finished drawing border BMP" + String(filename) + " in " + String(endTime - startTime) + "ms");
   }
 };
 #endif
