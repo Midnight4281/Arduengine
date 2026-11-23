@@ -32,22 +32,23 @@ class AbstractGame {
     String name;
 
     DIYables_TFT_ILI9486_Shield display;
-    File bmpFile;
-    uint32_t fileSize;
-    uint32_t imageOffset;
-    uint32_t dibHeaderSize;
-    uint32_t bmpWidth;
-    int32_t bmpHeight;
+
+    File bmpFile; //initialize the BMP file for reading & pipelining
+    uint32_t fileSize, imageOffset, dibHeaderSize, bmpWidth, bmpHeight; //all the settings for reading the BMP, stored & initialized here for same-image pipelining
     bool topDown;
     uint16_t planes;
     uint16_t depth;
+    uint8_t sdbuffer[3 * BUFFPIXEL];  // Buffer for 20 pixels (3 bytes per pixel)
+    uint16_t color;
+
+    uint8_t r, g, b; //r,g,b values for color; allocated here to save power at runtime
 
     File scFile;
     File saveFile;
     uint16_t SCREEN_WIDTH;
     uint16_t SCREEN_HEIGHT;
     
-    virtual void quitGame() = 0;//run by code before deleting game instance, use for storing highscores/settings
+    virtual void quitGame() = 0;//run by code before ending game instance, use for storing highscores/settings
     void exitGame() {//run by code when game ends, do not edit
       quitGame();
       display.fillScreen(DIYables_TFT::colorRGB(0, 0, 0));
@@ -184,7 +185,17 @@ class AbstractGame {
     configFile.close();
     return doc;
   }
-
+  /*Function to draw a section of a BMP image; used by most of the drawing processes in this engine
+    Filename: name of the file, automatically sorts for correct folder
+    x: x position (pixels)
+    y: y position (pixels)
+    sx: start x; the first X position on the BMP to draw from (i.e. 0 draws starting at the first column, 9 will draw starting at the 10th)
+    sy: start y; same idea as sx, but for vertical
+    tx: target x; the last X position to draw; uses index-based systems, but automatically accounts for overflow
+    ty: target y; same idea as tx, but for verticals
+    openFile: do you have to open & initialize a different image than the last drawing process?
+    closeFile: should you close the file at the end of the process to avoid wasting memory?
+  */
   void drawBMPSector(const char *filename, int x, int y, uint16_t sx, uint16_t sy, uint16_t tx, uint16_t ty, bool openFile = true, bool closeFile = true) {
     uint16_t xScale;
     uint16_t yScale;
@@ -208,8 +219,6 @@ class AbstractGame {
     // Move to the start of the image data
     bmpFile.seek(imageOffset);
 
-    uint8_t sdbuffer[3 * BUFFPIXEL];  // Buffer for 20 pixels (3 bytes per pixel)
-    uint16_t color;
     uint32_t rowSize = (bmpWidth * 3 + 3) & ~3;  // BMP rows are padded to 4-byte boundaries
 
     // Adjust x and y if image is larger than screen
@@ -233,9 +242,9 @@ class AbstractGame {
         bmpFile.read(sdbuffer, 3 * pixelsToRead);              // Read multiple pixels at once
 
         for (uint32_t i = 0; i < pixelsToRead; i++) {
-          uint8_t b = sdbuffer[i * 3];
-          uint8_t g = sdbuffer[i * 3 + 1];
-          uint8_t r = sdbuffer[i * 3 + 2];
+          b = sdbuffer[i * 3];
+          g = sdbuffer[i * 3 + 1];
+          r = sdbuffer[i * 3 + 2];
           if(r != 1 && g != 1 && b != 1) {
             color = DIYables_TFT::colorRGB(r, g, b);
             drawPixel(x + (col + i + sx) * xScale, y + (row + sy) * yScale, xScale, yScale, color);
@@ -255,20 +264,20 @@ class AbstractGame {
       drawBMPSector(filename, x, y, 0, 0, bmpWidth, bmpHeight, false, true);
     }
   }
-  //Function to draw a grid of the same BMP images
-  void drawBMPArea(const char *filename, int x, int y, int xAmt, int yAmt) {
-    Serial.println("Started drawing bmp area");
-    unsigned long startTime = millis();
-    uint16_t xScale;
-
-    uint16_t yScale;
-
-    uint16_t xSize;
-    uint16_t ySize;
-
+  /*Function to draw a grid of the same BMP images; uses slightly different algorithm than drawBMPsector to draw the same image at multiple points simultaneously
+    Filename: name of the file, automatically sorts for correct folder
+    x: x position (pixels)
+    y: y position (pixels)
+    xAmt: number of columns to draw
+    yAmt: number of rows to draw
+    openFile: do you have to open & initialize a different image than the last drawing process?
+    closeFile: should you close the file at the end of the process to avoid wasting memory?
+  */
+  void drawBMPArea(const char *filename, int x, int y, int xAmt, int yAmt, bool openFile = true, bool closeFile = true) {
+    uint16_t xScale, yScale, xSize, ySize;
     scFile = SD.open(name + "/" + String(filename) + ".sc");
     if (!scFile) {
-      Serial.println("Could not find SC");
+      Serial.println("Could not find SC " + String(filename));
       xScale = 1;
       yScale = 1;
     } else {
@@ -278,64 +287,16 @@ class AbstractGame {
       ySize = read16(scFile);
     }
     scFile.close();
-    bmpFile = SD.open(name + "/" + String(filename) + ".bmp");
-
-    if (!bmpFile) {
-      Serial.println("File not found");
-      return;
-    }
-
-    if (read16(bmpFile) != 0x4D42) {  // Check BMP signature
-      Serial.println("Not a BMP file");
-      bmpFile.close();
-      return;
-    }
-
-
-    uint32_t fileSize = read32(bmpFile);
-
-    read32(bmpFile); //skip bytes
-    
-    uint32_t imageOffset = read32(bmpFile);  // Start of image data
-
-    uint32_t dibHeaderSize = read32(bmpFile);  // DIB header size
-
-    // Now read the width and height of the image
-    uint32_t bmpWidth = read32(bmpFile);
-    int32_t bmpHeight = readS32(bmpFile);  // Read as signed 32-bit integer
-
-
-    bool topDown = false;  // Flag to check if the image is top-down
-    if (bmpHeight < 0) {
-      bmpHeight = -bmpHeight;  // Make height positive for processing
-      topDown = true;          // Mark the BMP as top-down
-    }
-
-    if (read16(bmpFile) != 1) {  // Planes must be 1
-      Serial.println("Invalid BMP file");
-      bmpFile.close();
-      return;
-    }
-
-    uint16_t depth = read16(bmpFile);  // Color depth
-
-    if (depth != 24) {  // Only 24-bit BMP supported
-      Serial.println("Only 24-bit BMP is supported");
-      bmpFile.close();
-      return;
-    }
-
-    if (read32(bmpFile) != 0) {  // No compression
-      Serial.println("Unsupported BMP compression");
-      bmpFile.close();
-      return;
+    if(openFile) {
+      verifyBMP(filename, true, false);
+    } else {
+      bmpFile.seek(0);
+      read16(bmpFile);
     }
 
     // Move to the start of the image data
     bmpFile.seek(imageOffset);
 
-    uint8_t sdbuffer[3 * BUFFPIXEL];  // Buffer for 20 pixels (3 bytes per pixel)
-    uint16_t color;
     uint32_t rowSize = (bmpWidth * 3 + 3) & ~3;  // BMP rows are padded to 4-byte boundaries
 
     // Adjust x and y if image is larger than screen
@@ -359,9 +320,9 @@ class AbstractGame {
         bmpFile.read(sdbuffer, 3 * pixelsToRead);              // Read multiple pixels at once
 
         for (uint32_t i = 0; i < pixelsToRead; i++) {
-          uint8_t b = sdbuffer[i * 3];
-          uint8_t g = sdbuffer[i * 3 + 1];
-          uint8_t r = sdbuffer[i * 3 + 2];
+          b = sdbuffer[i * 3];
+          g = sdbuffer[i * 3 + 1];
+          r = sdbuffer[i * 3 + 2];
           if(r != 1 && g != 1 && b != 1) {
             color = DIYables_TFT::colorRGB(r, g, b);
 
@@ -375,12 +336,11 @@ class AbstractGame {
         }
       }
     }
-
-    bmpFile.close();  // Close file when done
-    unsigned long endTime = millis();
-    Serial.println("Finshed drawing bmp area in " + String(endTime - startTime) + "ms");
+    if(closeFile) {
+      bmpFile.close();  // Close file when done
+    }
   }
-  // Function to get BMP image dimensions
+  // Function to get BMP image dimensions and settings; stores them in all of the global variables declared earlier
   bool verifyBMP(const char *filename, bool openFile = true, bool closeFile = true) {
     if(openFile) {
       bmpFile = SD.open(name + "/" + String(filename) + ".bmp");
@@ -472,13 +432,13 @@ class AbstractGame {
         uint16_t color;
         uint32_t rowSize = (bmpWidth * 3 + 3) & ~3;  // BMP rows are padded to 4-byte boundaries
         bmpFile.read(sdbuffer, 3);
-        uint8_t b = sdbuffer[0];
-        uint8_t g = sdbuffer[1];
-        uint8_t r = sdbuffer[2];
+        b = sdbuffer[0];
+        g = sdbuffer[1];
+        r = sdbuffer[2];
         color = DIYables_TFT::colorRGB(r, g, b);
         display.fillRect(x, y, xScale * bmpWidth, radius, color);
-        display.fillRect(x, y + radius, radius, yScale * bmpHeight, color);
-        display.fillRect(x + xScale * bmpWidth - radius, y + radius, radius, yScale * bmpHeight, color);
+        display.fillRect(x, y + radius, radius, yScale * bmpHeight - radius * 2, color);
+        display.fillRect(x + xScale * bmpWidth - radius, y + radius, radius, yScale * bmpHeight - radius * 2, color);
         display.fillRect(x, y + yScale * bmpHeight - radius, xScale * bmpWidth, radius, color);
         return;
       } else {//standard, detailed border drawing
