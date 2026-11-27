@@ -16,7 +16,7 @@ class Minesweeper: public AbstractGame {
   public:
     Board board;
     Minesweeper(bool* flag) : AbstractGame(flag) {
-      name = getName();
+      //name = "sweep";
     }
     void quitGame() {}
     void startGame() {
@@ -28,7 +28,7 @@ class Minesweeper: public AbstractGame {
       drawScale = SCREEN_WIDTH / xSize;
       reset();
     }
-    static String getName() {
+    String getName() override {
       return "sweep";
     }
     static String getDisplayName() {
@@ -41,5 +41,6 @@ class Minesweeper: public AbstractGame {
     void reset();
     void frameTick();
     void drawTile(int16_t tile, bool drawMiddle, bool drawBorder, bool borderOn);
+    void reGenerate();
 };
 #endif

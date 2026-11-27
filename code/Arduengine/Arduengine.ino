@@ -8,6 +8,7 @@
 #include "ButtonManager.h"
 #include <DIYables_TFT_Shield.h>
 
+
 //REMINDER: All images must be stored in BMP format
 
 #define BLACK     DIYables_TFT::colorRGB(0, 0, 0)
@@ -45,7 +46,7 @@ StringGameList nameGameList[] = {
 
 AbstractGame* game;
 
-uint8_t numberOfGames = sizeof(createGameList) / sizeof(createGameList[0]);;
+uint8_t numberOfGames = sizeof(createGameList) / sizeof(createGameList[0]);
 
 bool gameWasDeleted;
 uint8_t currentGameSelection;
@@ -53,11 +54,11 @@ uint8_t currentGameSelection;
 Minesweeper m(&gameWasDeleted);
 
 //left, right, up, down, SELECT, START, B, A 
-
 void setup()
 {
   Serial.begin(9600);
   Serial.println("Start");
+  Serial.flush();
   delay(100);
   display.begin();
   display.setRotation(2);
@@ -74,7 +75,7 @@ void setup()
   pcf.pinMode(7, INPUT);
   
   Serial.print("Initializing PCF8574...");
-  if (pcf.begin()){
+  if (pcf.begin()) {
     Serial.println("OK");
   } else {
     Serial.println("KO");
@@ -124,6 +125,7 @@ void loop()
   bool b[8];
   for(int i = 0; i < 8; i++) {
     b[7 - i] = !pcf.digitalRead(i); // set each bool to be if the corresponding button is pressed
+    delay(1);
   }
   buttons.passInputs(b);
 

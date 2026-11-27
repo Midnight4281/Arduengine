@@ -21,7 +21,6 @@ class SnakeGame : public AbstractGame {
     int8_t yDir;
     uint8_t frameCount = 0;
     SnakeGame(bool* flag) : AbstractGame(flag) {
-      name = getName();
       frameRate = 20;
     }
 
@@ -32,7 +31,7 @@ class SnakeGame : public AbstractGame {
       reset();
 
     }
-    static String getName() {
+    String getName() override{
       return "snake";
     }
     static String getDisplayName() {

@@ -146,10 +146,9 @@ void Minesweeper::drawTile(int16_t tile, bool drawMiddle, bool drawBorder, bool 
     }
   }
 }
-void Minesweeper::reset() {
-  display.fillScreen(DIYables_TFT::colorRGB(0, 0, 0));
+void Minesweeper::reGenerate() {
   changeSeed();
-  currentPos = 0;
+  currentPos = xSize * ySize / 2 + xSize / 2;
   revealed = 0;
   flagged = 0;
   board.reset(xSize, ySize);
@@ -178,6 +177,12 @@ void Minesweeper::reset() {
       board.setVal(i, f);
     }
   }
+}
+void Minesweeper::reset() {
+  display.fillScreen(DIYables_TFT::colorRGB(0, 0, 0));
+  do  {
+      reGenerate();
+  } while (board.getVal(currentPos) != 0);
   drawBMPArea("hidden", 0, 0, xSize, ySize);
   
   drawTile(currentPos, false, true, true);

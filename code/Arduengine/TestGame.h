@@ -31,7 +31,7 @@ class TestGame : public AbstractGame {
     void startGame() {
       reset();
     }
-    static String getName() {
+    String getName() override {
       return "ttt";
     }
     static String getDisplayName() {

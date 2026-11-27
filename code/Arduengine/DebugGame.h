@@ -30,7 +30,7 @@ class DebugGame : public AbstractGame {
     void startGame() {
       reset();
     }
-    static String getName() {
+    String getName() override {
       return "debug";
     }
     static String getDisplayName() {

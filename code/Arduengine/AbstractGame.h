@@ -16,11 +16,25 @@ class AbstractGame {
     const int seed_addr = 0;
     unsigned long seed;
     bool* _isDeletedFlag;
+
+    File bmpFile; //initialize the BMP file for reading & pipelining
+    uint32_t fileSize, imageOffset, dibHeaderSize, bmpWidth, bmpHeight; //all the settings for reading the BMP, stored & initialized here for same-image pipelining
+    bool topDown; //used by BMP drawing algorithm
+    uint16_t planes, depth; // used during BMP verification; otherwise useless
+    uint8_t sdbuffer[3 * BUFFPIXEL];  // Buffer for 20 pixels (3 bytes per pixel)
+    uint16_t color; //allocating the bytes for the color used during drawing here for improved performance
+
+    uint8_t r, g, b; //r,g,b values for color; allocated here to save power at runtime
+
+    File scFile;
+    File saveFile;
+    uint16_t SCREEN_WIDTH;
+    uint16_t SCREEN_HEIGHT;
   public:
     AbstractGame(bool* flag) {
       _isDeletedFlag = flag;
-      *_isDeletedFlag = false; 
-      //name = getName();
+      *_isDeletedFlag = false;
+      name = getName();
     }
     ~AbstractGame() {
         if (_isDeletedFlag != nullptr) {
@@ -33,32 +47,23 @@ class AbstractGame {
 
     DIYables_TFT_ILI9486_Shield display;
 
-    File bmpFile; //initialize the BMP file for reading & pipelining
-    uint32_t fileSize, imageOffset, dibHeaderSize, bmpWidth, bmpHeight; //all the settings for reading the BMP, stored & initialized here for same-image pipelining
-    bool topDown;
-    uint16_t planes;
-    uint16_t depth;
-    uint8_t sdbuffer[3 * BUFFPIXEL];  // Buffer for 20 pixels (3 bytes per pixel)
-    uint16_t color;
-
-    uint8_t r, g, b; //r,g,b values for color; allocated here to save power at runtime
-
-    File scFile;
-    File saveFile;
-    uint16_t SCREEN_WIDTH;
-    uint16_t SCREEN_HEIGHT;
-    
     virtual void quitGame() = 0;//run by code before ending game instance, use for storing highscores/settings
-    void exitGame() {//run by code when game ends, do not edit
+    void exitGame() {//run by code when game ends, DO NOT EDIT
       quitGame();
       display.fillScreen(DIYables_TFT::colorRGB(0, 0, 0));
       delete this;
       return;
     }
+    //must be overwritten by children, runs on initialization of the game after the constructor
     virtual void startGame() = 0;
-    static String getName() {};
+    //make sure you override this; otherwise it the game will not find assets properly. All assets should be stored under [gameName/assetName] on the SD card
+    //note that when reading from the SD card, the arduino will fail to find any files with any folder or file longer than 8 characters, or an extension longer than 3 characters
+    virtual String getName() {return "Default";}
+    //used to display the name; can be anything
     static String getDisplayName() {};
+    //DO NOT EDIT; USED TO STARTUP GAME SYSTEMS
     void gameSetup(ButtonManager *b, const DIYables_TFT_ILI9486_Shield& d) {
+      name = getName();
       buttons = b;
       display = d;
       display.setRotation(2);  // Rotate screen 180 degrees
@@ -73,10 +78,24 @@ class AbstractGame {
       Serial.println("SD card initialized successfully.");
       startGame();
     }
+    //Function to psuedo-randomly reseed the seed based off a value stored in EEPROM
     void changeSeed() {
       seed = EEPROM.read(seed_addr);
       EEPROM.write(seed_addr, seed+1);
       randomSeed(seed);
+    }
+    //Function to set the random seed to a known number
+    void setSeed(unsigned long val) {
+      seed = val;
+      randomSeed(seed);
+    }
+    //generates a random integer between min and max (min inclusive, max exclusive) using the seed (i.e. randInt(5,10) will return 5, 6, 7, 8, or 9 randomly)
+    int16_t randInt(int16_t min, int16_t max) {
+      return min + (rand() % (max - min));
+    }
+    //generates a random integer between 0 and max (max inclusive) using the seed (i.e randInt(2) will return 0, 1, or 2 randomly)
+    int16_t randInt(int16_t max) {
+      return randInt(0, max + 1);
     }
     void clearScreen() {
       display.fillScreen(DIYables_TFT::colorRGB(0, 0, 0));
@@ -84,8 +103,8 @@ class AbstractGame {
     float randomFloatRange(float minVal, float maxVal) {
       return minVal + (random(0, 1000000) / 1000000.0) * (maxVal - minVal);
     }
-    virtual void frameTick() = 0;
-    uint8_t getFrameRate() {
+    virtual void frameTick() = 0; //override this in children for the central refresh logic (this runs once per frame)
+    uint8_t getFrameRate() {// Used to get the active framerate of the game
       if(frameRate != 0) {
         return frameRate;
       } else {
@@ -118,36 +137,39 @@ class AbstractGame {
     return result;
   }
   void drawPixel(int16_t x, int16_t y, uint8_t xs, uint8_t ys, uint16_t color) {
-    for(int k = 0; k < xs; k++) {
-      for(int j = 0; j < ys; j++) {
-        if ((x + k) < SCREEN_WIDTH && (y + j) < SCREEN_HEIGHT) {
-          display.drawPixel(x + k, y + j, color);
-        }
-      }
-    }
+    display.fillRect(x, y, xs, ys, color);
   }
   void drawPixelInImage(int16_t x, int16_t y, uint8_t xd, uint8_t yd, uint8_t xs, uint8_t ys, uint16_t color) {
     drawPixel(x + (xd * xs), y + (yd * ys), xs, ys, color);
   }
-  uint16_t readSaveFile(uint16_t pos) {
-    saveFile = SD.open(name + "/" + name + ".sv");
+  /*
+  Used to read information from the save file at any position.
+  If you try to read to a non-existent value, it will return 0
+  Only supports unsigned 16-bit integers*/
+  uint16_t readSaveFile(uint16_t pos, bool openFile = true, bool closeFile = true, String customName = "") {
+    if(openFile) {
+      saveFile = SD.open(name + "/" + (customName == "" ? name : customName) + ".sv");
+    }
     if(!saveFile) {
       return 0;
     }
     unsigned long fileLength = saveFile.size();
-    Serial.println(fileLength);
     if(fileLength <= pos * 2) {
-      Serial.println("returning 0");
-      saveFile.close();
+      if(closeFile) {
+        saveFile.close();
+      }
       return 0;
     }
     saveFile.seek(pos * 2);
     uint16_t toReturn = makeWord(saveFile.read(), saveFile.read());
-    saveFile.close();
+    if(closeFile) {
+      saveFile.close();
+    }
     return(toReturn);
   }
-  void editSaveFile(uint16_t pos, uint16_t val) {
-    saveFile = SD.open(name + "/" + name + ".sv", O_RDWR);
+  //helper used to edit/replace existing data in the save file; not recommended to use manually
+  void editSaveFile(uint16_t pos, uint16_t val, String n, bool openFile = true, bool closeFile = true) {
+    saveFile = SD.open(n, O_RDWR);
     if(!saveFile) {
       return;
     }
@@ -156,28 +178,36 @@ class AbstractGame {
     saveFile.write(lowByte(val));
     saveFile.close();
   }
-  void appendSaveFile(uint16_t val) {
-    saveFile = SD.open(name + "/" + name + ".sv", FILE_WRITE);
+  //helper used to append data to the end of the save file; not recommended to use manually
+  void appendSaveFile(uint16_t val, String n, bool openFile = true, bool closeFile = true) {
+    if(openFile) {
+      saveFile = SD.open(n, FILE_WRITE);
+    }
     if(!saveFile) {
       return;
     }
     saveFile.write(highByte(val));
     saveFile.write(lowByte(val));
-    saveFile.close();
-  }
-  void writeToSave(uint16_t pos, uint16_t val) {
-    saveFile = SD.open(name + "/" + name + ".sv", FILE_WRITE);
-    unsigned long fileLength = saveFile.size() / 2;
-    saveFile.close();
-    if(fileLength >= pos) {
-      editSaveFile(pos, val);
-    } else {
-      for(int i = 0; i < pos - fileLength; i++) {
-        appendSaveFile(0);
-      }
-      editSaveFile(pos, val);
+    if(closeFile) {
+      saveFile.close();
     }
   }
+  /*
+  Function to write data to the save file at any position.
+  If you try to write to a position past the end of the current save, it will add to the end of the file, filling in zeros to fix the empty space.
+  Note that currently this only supports unsigned 16-bit integers. (0-65,535)*/
+  void writeToSave(uint16_t pos, uint16_t val, String customName = "") {
+    saveFile = SD.open(name + "/" + (customName == "" ? name : customName) + ".sv", FILE_WRITE);
+    unsigned long fileLength = saveFile.size() / 2;
+    saveFile.close();
+    if(fileLength < pos) {
+      for(int i = 0; i < pos - fileLength; i++) {
+        appendSaveFile(0, (customName == "" ? name : customName), i == 0, i == pos - fileLength - 1);
+      }
+    }
+    editSaveFile(pos, val, (customName == "" ? name : customName));
+  }
+  //WIP
   JsonDocument readTextFromJson(const char *filename) {
     File configFile = SD.open(name + "/jsonStorage/" + filename + ".json");
     JsonDocument doc;

@@ -91,13 +91,6 @@ void TestGame::drawTile(uint8_t t, bool checkBorder, bool checkMark) {
   int xDraw = t % 3 * 100 + 10;
   int yDraw = floor(t / 3) * 100 + 10;
   int v = board[t];
-
-  //display.drawCircle(xDraw + 50, yDraw + 50, 40, DIYables_TFT::colorRGB(255, 255, 255));
-  //display.drawLine(xDraw + 10, yDraw + 10, xDraw + 90, yDraw + 90, DIYables_TFT::colorRGB(255, 255, 255));
-  //display.drawLine(xDraw + 10, yDraw + 90, xDraw + 90, yDraw + 10, DIYables_TFT::colorRGB(255, 255, 255));
-  //display.drawRect(xDraw + 1, yDraw + 1, 98, 98, DIYables_TFT::colorRGB(255, 255, 255));
-
-  //display.drawRect(xDraw, yDraw, 100, 100, DIYables_TFT::colorRGB(0, 0, 0));
   if(checkMark) {
     if(v == 1) {
       drawBMP("o", xDraw + 10, yDraw + 10);
@@ -109,9 +102,9 @@ void TestGame::drawTile(uint8_t t, bool checkBorder, bool checkMark) {
   }
   if(checkBorder) {
     if(t == selectedTile) {
-      drawBorderBMP("border", xDraw, yDraw, 10);
+      drawBorderBMP("border", xDraw, yDraw, 10, true);
     } else {
-      drawBorderBMP("empty", xDraw, yDraw, 10);
+      drawBorderBMP("empty", xDraw, yDraw, 10, false);
     }
   }
 }
